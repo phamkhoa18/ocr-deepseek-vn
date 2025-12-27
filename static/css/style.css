@@ -200,6 +200,42 @@ header h1 i {
     box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
 }
 
+.format-selector {
+    margin-bottom: 15px;
+}
+
+.format-selector label {
+    display: block;
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--text-primary);
+}
+
+.format-selector label i {
+    margin-right: 8px;
+    color: var(--primary-color);
+}
+
+.format-selector select {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 1rem;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.format-selector select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
 .prompt-examples {
     display: flex;
     flex-wrap: wrap;

@@ -127,7 +127,8 @@ async function processOCR() {
     try {
         const formData = new FormData();
         formData.append('image', currentFile);
-        formData.append('prompt', promptInput.value || '<image>\nFree OCR.');
+        formData.append('prompt', promptInput.value || '');
+        formData.append('format', document.getElementById('formatSelect').value || 'markdown');
         
         const response = await fetch('/api/ocr', {
             method: 'POST',
@@ -137,7 +138,17 @@ async function processOCR() {
         const data = await response.json();
         
         if (data.success) {
-            resultText.textContent = data.text || 'Không có kết quả';
+            // Hiển thị kết quả với format phù hợp
+            const text = data.text || 'Không có kết quả';
+            
+            // Nếu là markdown, render đẹp hơn
+            if (data.format === 'markdown' && text.includes('##') || text.includes('**')) {
+                // Render markdown cơ bản
+                resultText.innerHTML = formatMarkdown(text);
+            } else {
+                resultText.textContent = text;
+            }
+            
             resultSection.style.display = 'block';
             // Scroll to result
             resultSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -152,8 +163,21 @@ async function processOCR() {
     }
 }
 
+function formatMarkdown(text) {
+    // Basic markdown rendering
+    let html = text
+        .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+        .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+        .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+        .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/gim, '<em>$1</em>')
+        .replace(/\n/g, '<br>');
+    return html;
+}
+
 function copyResult() {
-    const text = resultText.textContent;
+    // Copy text content (nếu là HTML thì lấy textContent)
+    const text = resultText.textContent || resultText.innerText || '';
     
     if (navigator.clipboard) {
         navigator.clipboard.writeText(text).then(() => {

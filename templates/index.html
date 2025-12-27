@@ -38,17 +38,26 @@
                 <div class="prompt-input-wrapper">
                     <textarea 
                         id="promptInput" 
-                        placeholder="Nhập prompt của bạn... (Để trống sẽ dùng 'Free OCR')"
+                        placeholder="Nhập prompt của bạn... (Để trống sẽ tự động chọn theo Format)"
                         rows="3"
                     ></textarea>
                 </div>
+                <div class="format-selector">
+                    <label for="formatSelect">
+                        <i class="fas fa-file-code"></i> Format Output:
+                    </label>
+                    <select id="formatSelect">
+                        <option value="markdown">Markdown (Đẹp, có layout)</option>
+                        <option value="full">Full (Có bounding boxes)</option>
+                        <option value="text">Text Only (Chỉ văn bản)</option>
+                    </select>
+                </div>
                 <div class="prompt-examples">
                     <span class="example-label">Ví dụ:</span>
-                    <button class="example-btn" data-prompt='<image>\nFree OCR.'>Free OCR</button>
-                    <button class="example-btn" data-prompt='<image>\n<|grounding|>Convert the document to markdown.'>Convert to Markdown</button>
-                    <button class="example-btn" data-prompt='<image>\n<|grounding|>OCR this image.'>OCR Image</button>
+                    <button class="example-btn" data-prompt='' data-format='markdown'>Markdown (Khuyến nghị)</button>
+                    <button class="example-btn" data-prompt='' data-format='full'>Full Layout</button>
+                    <button class="example-btn" data-prompt='<image>\nFree OCR.' data-format='text'>Text Only</button>
                     <button class="example-btn" data-prompt='<image>\nParse the figure.'>Parse Figure</button>
-                    <button class="example-btn" data-prompt='<image>\nDescribe this image in detail.'>Describe Image</button>
                 </div>
             </div>
 

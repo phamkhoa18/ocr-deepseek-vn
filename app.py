@@ -1,5 +1,6 @@
 import os
 import torch
+import re
 from flask import Flask, request, jsonify, render_template, send_from_directory
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
@@ -8,6 +9,102 @@ import io
 import base64
 from config import *
 from transformers import AutoModel, AutoTokenizer
+
+def format_ocr_result(text, output_format='markdown'):
+    """Format OCR result với layout đẹp"""
+    if not text:
+        return text
+    
+    # Nếu có <|ref|> và <|det|> tags (grounding format)
+    if '<|ref|>' in text and '<|det|>' in text:
+        if output_format == 'markdown':
+            # Convert sang markdown đẹp
+            return format_to_markdown(text)
+        elif output_format == 'full':
+            # Giữ nguyên format với bounding boxes
+            return format_with_boxes(text)
+        else:
+            # Chỉ lấy text, bỏ tags
+            return extract_text_only(text)
+    else:
+        # Không có tags, trả về nguyên bản
+        return text
+
+def format_to_markdown(text):
+    """Convert OCR result với <|ref|> tags sang markdown"""
+    lines = text.split('\n')
+    markdown_lines = []
+    current_section = None
+    
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+            
+        # Parse <|ref|>tag<|/ref|><|det|>[[x1,y1,x2,y2]]<|/det|>
+        ref_match = re.search(r'<\|ref\|>(.*?)<\|/ref\|>', line)
+        det_match = re.search(r'<\|det\|>\[\[(.*?)\]\]<\|/det\|>', line)
+        
+        if ref_match:
+            tag = ref_match.group(1)
+            # Lấy text sau tags
+            text_part = re.sub(r'<\|ref\|>.*?<\|/ref\|>', '', line)
+            text_part = re.sub(r'<\|det\|>.*?<\|/det\|>', '', text_part).strip()
+            
+            # Format theo tag type
+            if tag == 'sub_title' or tag == 'title':
+                markdown_lines.append(f'\n## {text_part}\n')
+            elif tag == 'text':
+                markdown_lines.append(text_part)
+            elif tag == 'image':
+                markdown_lines.append(f'\n![Image]({text_part})\n')
+            else:
+                markdown_lines.append(f'**{tag}**: {text_part}')
+        else:
+            # Không có tags, thêm text bình thường
+            clean_line = re.sub(r'<\|.*?\|>', '', line).strip()
+            if clean_line:
+                markdown_lines.append(clean_line)
+    
+    return '\n'.join(markdown_lines)
+
+def format_with_boxes(text):
+    """Format với bounding boxes info"""
+    lines = text.split('\n')
+    formatted_lines = []
+    
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+            
+        # Parse tags
+        ref_match = re.search(r'<\|ref\|>(.*?)<\|/ref\|>', line)
+        det_match = re.search(r'<\|det\|>\[\[(.*?)\]\]<\|/det\|>', line)
+        
+        if ref_match and det_match:
+            tag = ref_match.group(1)
+            bbox = det_match.group(1)
+            text_part = re.sub(r'<\|ref\|>.*?<\|/ref\|>', '', line)
+            text_part = re.sub(r'<\|det\|>.*?<\|/det\|>', '', text_part).strip()
+            
+            formatted_lines.append(f'[{tag}] {text_part} | BBox: {bbox}')
+        else:
+            clean_line = re.sub(r'<\|.*?\|>', '', line).strip()
+            if clean_line:
+                formatted_lines.append(clean_line)
+    
+    return '\n'.join(formatted_lines)
+
+def extract_text_only(text):
+    """Chỉ lấy text, bỏ tất cả tags"""
+    # Remove all tags
+    clean_text = re.sub(r'<\|.*?\|>', '', text)
+    # Remove bounding boxes format
+    clean_text = re.sub(r'\[\[.*?\]\]', '', clean_text)
+    # Clean up multiple spaces
+    clean_text = re.sub(r'\s+', ' ', clean_text)
+    return clean_text.strip()
 
 # Patch để fix lỗi DynamicCache.seen_tokens (transformers >= 4.41)
 def patch_dynamic_cache():
@@ -259,9 +356,17 @@ def ocr():
             }), 400
         
         # Get prompt from form
-        prompt_text = request.form.get('prompt', '<image>\nFree OCR.')
-        if not prompt_text.strip():
-            prompt_text = '<image>\nFree OCR.'
+        prompt_text = request.form.get('prompt', '').strip()
+        output_format = request.form.get('format', 'markdown')  # markdown, text, full
+        
+        # Chọn prompt phù hợp với format
+        if not prompt_text:
+            if output_format == 'markdown':
+                prompt_text = '<image>\n<|grounding|>Convert the document to markdown.'
+            elif output_format == 'full':
+                prompt_text = '<image>\n<|grounding|>OCR this image.'
+            else:
+                prompt_text = '<image>\nFree OCR.'
         
         # Read image
         image_bytes = file.read()
@@ -393,17 +498,27 @@ def ocr():
             except Exception as e:
                 print(f"⚠️  Không thể đọc file mới nhất: {e}")
         
-        # Clean up result text
+        # Clean up và format result text
         if result_text:
             result_text = result_text.strip()
+            
+            # Parse và format kết quả đẹp hơn nếu có <|ref|> và <|det|> tags
+            if '<|ref|>' in result_text or '<|det|>' in result_text:
+                # Format với layout info
+                formatted_text = format_ocr_result(result_text, output_format)
+            else:
+                formatted_text = result_text
         else:
+            formatted_text = "Không tìm thấy kết quả. Vui lòng kiểm tra logs."
             print(f"⚠️  Không tìm thấy kết quả. Output path: {output_path}")
             print(f"⚠️  Files trong OUTPUT_FOLDER: {os.listdir(OUTPUT_FOLDER) if os.path.exists(OUTPUT_FOLDER) else 'Không tồn tại'}")
         
         return jsonify({
             'success': True,
-            'text': result_text if result_text else "Không tìm thấy kết quả. Vui lòng kiểm tra logs.",
-            'filename': filename
+            'text': formatted_text,
+            'raw_text': result_text if result_text else "",
+            'filename': filename,
+            'format': output_format
         })
         
     except Exception as e:
