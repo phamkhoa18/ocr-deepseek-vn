@@ -50,28 +50,26 @@ def init_model():
         print("Lưu ý: Model sẽ được tải từ Hugging Face (~20-30GB)")
         
         # Thử dùng flash attention nếu có GPU, nếu không thì dùng default
+        # Không dùng flash_attention_2 vì có thể gây lỗi với một số version transformers
         try:
-            if DEVICE == 'cuda' and torch.cuda.is_available():
-                model = AutoModel.from_pretrained(
-                    MODEL_NAME,
-                    _attn_implementation='flash_attention_2',
-                    trust_remote_code=True,
-                    use_safetensors=True
-                )
-            else:
-                model = AutoModel.from_pretrained(
-                    MODEL_NAME,
-                    trust_remote_code=True,
-                    use_safetensors=True
-                )
-        except Exception as e:
-            print(f"Warning: Không thể dùng flash_attention_2: {e}")
-            print("Đang thử với attention mặc định...")
+            # Thử load model với trust_remote_code (bắt buộc cho DeepSeek-OCR)
             model = AutoModel.from_pretrained(
                 MODEL_NAME,
                 trust_remote_code=True,
-                use_safetensors=True
+                use_safetensors=True,
+                torch_dtype=torch.bfloat16 if DTYPE == 'bfloat16' else (torch.float16 if DTYPE == 'float16' else torch.float32)
             )
+        except Exception as e:
+            print(f"Warning: Lỗi khi tải model với dtype: {e}")
+            print("Đang thử lại với dtype mặc định...")
+            try:
+                model = AutoModel.from_pretrained(
+                    MODEL_NAME,
+                    trust_remote_code=True,
+                    use_safetensors=True
+                )
+            except Exception as e2:
+                raise Exception(f"Không thể tải model: {str(e2)}")
         
         # Move to device and set dtype
         dtype_map = {

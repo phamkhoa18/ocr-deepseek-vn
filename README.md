@@ -47,17 +47,31 @@ cd DeepSeek-OCR
 
 ### Bước 2: Tạo môi trường ảo
 
+**🐧 Linux/Mac (Khuyến nghị - Không cần Conda):**
 ```bash
-# Sử dụng conda (khuyến nghị)
+# Tạo virtual environment
+python3 -m venv venv
+
+# Kích hoạt
+source venv/bin/activate
+```
+
+**Hoặc dùng script tự động:**
+```bash
+chmod +x install.sh
+./install.sh
+```
+
+**🪟 Windows:**
+```bash
+python -m venv venv
+venv\Scripts\activate
+```
+
+**🐍 Conda (Nếu đã cài):**
+```bash
 conda create -n deepseek-ocr python=3.12.9 -y
 conda activate deepseek-ocr
-
-# Hoặc sử dụng venv
-python -m venv venv
-# Windows
-venv\Scripts\activate
-# Linux/Mac
-source venv/bin/activate
 ```
 
 ### Bước 3: Cài đặt PyTorch

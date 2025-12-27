@@ -2,12 +2,12 @@
 
 ## Cài đặt nhanh
 
-### 1. Tạo môi trường và cài đặt
+### 🪟 Windows
 
 ```bash
 # Tạo môi trường
-conda create -n deepseek-ocr python=3.12.9 -y
-conda activate deepseek-ocr
+python -m venv venv
+venv\Scripts\activate
 
 # Cài PyTorch
 pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu118
@@ -15,8 +15,42 @@ pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https
 # Cài các package khác
 pip install -r requirements.txt
 
-# Cài flash-attn (tùy chọn, có thể bỏ qua nếu lỗi)
+# Cài flash-attn (tùy chọn)
 pip install flash-attn==2.7.3 --no-build-isolation
+```
+
+### 🐧 Linux / Mac
+
+**Cách 1: Dùng script (Khuyến nghị)**
+```bash
+chmod +x install.sh run.sh
+./install.sh
+./run.sh
+```
+
+**Cách 2: Thủ công**
+```bash
+# Tạo môi trường
+python3 -m venv venv
+source venv/bin/activate
+
+# Cài PyTorch (có GPU)
+pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu118
+
+# Hoặc PyTorch CPU (không có GPU)
+pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cpu
+
+# Cài các package khác
+pip install -r requirements.txt
+```
+
+### 🐍 Conda (Nếu đã cài)
+
+```bash
+conda create -n deepseek-ocr python=3.12.9 -y
+conda activate deepseek-ocr
+pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu118
+pip install -r requirements.txt
 ```
 
 ### 2. Chạy ứng dụng
