@@ -9,6 +9,56 @@ import base64
 from config import *
 from transformers import AutoModel, AutoTokenizer
 
+# Patch để fix lỗi DynamicCache.seen_tokens (transformers >= 4.41)
+def patch_dynamic_cache():
+    """Patch DynamicCache để tương thích với transformers mới"""
+    try:
+        from transformers.cache_utils import DynamicCache
+        import transformers
+        
+        # Kiểm tra version transformers
+        version_parts = transformers.__version__.split('.')
+        major, minor = int(version_parts[0]), int(version_parts[1])
+        
+        # Nếu transformers >= 4.41, cần patch
+        if major > 4 or (major == 4 and minor >= 41):
+            # Thêm thuộc tính seen_tokens nếu chưa có
+            if not hasattr(DynamicCache, 'seen_tokens'):
+                def _get_seen_tokens(self):
+                    """Get seen_tokens từ cache_position"""
+                    try:
+                        if hasattr(self, 'cache_position') and len(self.cache_position) > 0:
+                            return len(self.cache_position)
+                        elif hasattr(self, 'key_cache') and len(self.key_cache) > 0:
+                            # Fallback: tính từ key_cache shape
+                            return self.key_cache[0].shape[2] if len(self.key_cache) > 0 else 0
+                    except:
+                        pass
+                    return 0
+                
+                DynamicCache.seen_tokens = property(_get_seen_tokens)
+                
+                # Thêm method get_max_length nếu chưa có
+                if not hasattr(DynamicCache, 'get_max_length'):
+                    def _get_max_length(self):
+                        """Get max length từ cache"""
+                        try:
+                            if hasattr(self, 'get_max_cache_shape'):
+                                shape = self.get_max_cache_shape()
+                                if shape and len(shape) > 1:
+                                    return shape[1]
+                        except:
+                            pass
+                        return None
+                    DynamicCache.get_max_length = _get_max_length
+                
+                print("✅ Đã patch DynamicCache để tương thích với transformers mới")
+    except Exception as e:
+        print(f"⚠️  Không thể patch DynamicCache: {e}")
+
+# Chạy patch ngay khi import
+patch_dynamic_cache()
+
 app = Flask(__name__)
 CORS(app)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
