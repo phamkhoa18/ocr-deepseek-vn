@@ -49,27 +49,34 @@ def init_model():
         print("Đang tải model (có thể mất vài phút lần đầu)...")
         print("Lưu ý: Model sẽ được tải từ Hugging Face (~20-30GB)")
         
-        # Thử dùng flash attention nếu có GPU, nếu không thì dùng default
-        # Không dùng flash_attention_2 vì có thể gây lỗi với một số version transformers
+        # Kiểm tra và cài flash-attn nếu cần (để có LlamaFlashAttention2)
         try:
-            # Thử load model với trust_remote_code (bắt buộc cho DeepSeek-OCR)
+            import flash_attn
+            print("✅ flash-attn đã được cài đặt")
+        except ImportError:
+            print("⚠️  flash-attn chưa được cài. Model code có thể cần nó.")
+            print("   Đang thử tải model mà không dùng flash attention...")
+        
+        # Thử load model - model code sẽ tự xử lý flash attention
+        try:
+            # Không chỉ định _attn_implementation để model tự quyết định
             model = AutoModel.from_pretrained(
                 MODEL_NAME,
                 trust_remote_code=True,
-                use_safetensors=True,
-                torch_dtype=torch.bfloat16 if DTYPE == 'bfloat16' else (torch.float16 if DTYPE == 'float16' else torch.float32)
+                use_safetensors=True
             )
         except Exception as e:
-            print(f"Warning: Lỗi khi tải model với dtype: {e}")
-            print("Đang thử lại với dtype mặc định...")
-            try:
-                model = AutoModel.from_pretrained(
-                    MODEL_NAME,
-                    trust_remote_code=True,
-                    use_safetensors=True
-                )
-            except Exception as e2:
-                raise Exception(f"Không thể tải model: {str(e2)}")
+            error_msg = str(e)
+            if "LlamaFlashAttention2" in error_msg or "flash" in error_msg.lower():
+                print("\n⚠️  Lỗi liên quan đến flash attention.")
+                print("💡 Giải pháp: Cài flash-attn hoặc cập nhật transformers")
+                print("\nChạy lệnh sau để khắc phục:")
+                print("  pip install flash-attn==2.7.3 --no-build-isolation")
+                print("  hoặc")
+                print("  pip install --upgrade transformers>=4.46.0")
+                raise Exception(f"Model yêu cầu flash-attn hoặc transformers mới hơn. Lỗi: {error_msg}")
+            else:
+                raise Exception(f"Không thể tải model: {error_msg}")
         
         # Move to device and set dtype
         dtype_map = {
