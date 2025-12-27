@@ -31,14 +31,21 @@ def format_ocr_result(text, output_format='markdown'):
         return text
 
 def format_to_markdown(text):
-    """Convert OCR result với <|ref|> tags sang markdown"""
+    """Convert OCR result với <|ref|> tags sang markdown - Giữ layout đẹp"""
     lines = text.split('\n')
     markdown_lines = []
-    current_section = None
+    last_tag = None
+    last_was_title = False
     
-    for line in lines:
-        line = line.strip()
-        if not line:
+    for i, line in enumerate(lines):
+        original_line = line
+        line_stripped = line.strip()
+        
+        # Giữ empty lines để giữ layout
+        if not line_stripped:
+            if last_was_title:
+                continue  # Bỏ empty line sau title
+            markdown_lines.append('')
             continue
             
         # Parse <|ref|>tag<|/ref|><|det|>[[x1,y1,x2,y2]]<|/det|>
@@ -47,26 +54,65 @@ def format_to_markdown(text):
         
         if ref_match:
             tag = ref_match.group(1)
-            # Lấy text sau tags
+            # Lấy text sau tags, giữ nguyên spacing
             text_part = re.sub(r'<\|ref\|>.*?<\|/ref\|>', '', line)
-            text_part = re.sub(r'<\|det\|>.*?<\|/det\|>', '', text_part).strip()
+            text_part = re.sub(r'<\|det\|>.*?<\|/det\|>', '', text_part)
+            text_part = text_part.strip()
             
-            # Format theo tag type
-            if tag == 'sub_title' or tag == 'title':
-                markdown_lines.append(f'\n## {text_part}\n')
+            if not text_part:
+                continue
+            
+            # Format theo tag type với layout đẹp
+            if tag in ['sub_title', 'title', 'heading']:
+                # Thêm spacing trước title
+                if not last_was_title and markdown_lines and markdown_lines[-1]:
+                    markdown_lines.append('')
+                markdown_lines.append(f'## {text_part}')
+                markdown_lines.append('')  # Empty line sau title
+                last_was_title = True
+                last_tag = tag
             elif tag == 'text':
+                # Text bình thường, giữ nguyên
                 markdown_lines.append(text_part)
+                last_was_title = False
+                last_tag = tag
             elif tag == 'image':
-                markdown_lines.append(f'\n![Image]({text_part})\n')
+                markdown_lines.append('')
+                markdown_lines.append(f'![Image]({text_part})')
+                markdown_lines.append('')
+                last_was_title = False
+            elif tag in ['list_item', 'bullet']:
+                markdown_lines.append(f'- {text_part}')
+                last_was_title = False
             else:
-                markdown_lines.append(f'**{tag}**: {text_part}')
+                # Tag khác, format với bold
+                markdown_lines.append(f'**{text_part}**')
+                last_was_title = False
+                last_tag = tag
         else:
-            # Không có tags, thêm text bình thường
+            # Không có tags, giữ nguyên text (có thể là markdown đã được format)
             clean_line = re.sub(r'<\|.*?\|>', '', line).strip()
             if clean_line:
-                markdown_lines.append(clean_line)
+                # Kiểm tra xem có phải markdown không
+                if clean_line.startswith('#') or clean_line.startswith('-') or clean_line.startswith('*'):
+                    markdown_lines.append(clean_line)
+                else:
+                    markdown_lines.append(clean_line)
+                last_was_title = False
     
-    return '\n'.join(markdown_lines)
+    # Clean up: loại bỏ nhiều empty lines liên tiếp
+    result = []
+    prev_empty = False
+    for line in markdown_lines:
+        if not line.strip():
+            if not prev_empty:
+                result.append('')
+            prev_empty = True
+        else:
+            result.append(line)
+            prev_empty = False
+    
+    return '\n'.join(result)
 
 def format_with_boxes(text):
     """Format với bounding boxes info"""

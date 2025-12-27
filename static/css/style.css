@@ -377,10 +377,98 @@ header h1 i {
     white-space: pre-wrap;
     word-wrap: break-word;
     color: var(--text-primary);
-    font-family: 'Courier New', monospace;
-    font-size: 0.95rem;
-    line-height: 1.6;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-size: 1rem;
+    line-height: 1.8;
     margin: 0;
+    padding: 0;
+}
+
+/* Markdown rendering styles */
+.result-content pre h1 {
+    color: var(--primary-color);
+    margin: 20px 0 15px 0;
+    font-weight: 700;
+    font-size: 1.8rem;
+    border-bottom: 3px solid var(--primary-color);
+    padding-bottom: 10px;
+}
+
+.result-content pre h2 {
+    color: var(--primary-color);
+    margin: 18px 0 12px 0;
+    font-weight: 600;
+    font-size: 1.5rem;
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: 8px;
+}
+
+.result-content pre h3 {
+    color: var(--primary-color);
+    margin: 15px 0 10px 0;
+    font-weight: 600;
+    font-size: 1.3rem;
+}
+
+.result-content pre h4 {
+    color: var(--text-primary);
+    margin: 12px 0 8px 0;
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+.result-content pre p {
+    margin: 8px 0;
+    line-height: 1.8;
+}
+
+.result-content pre ul {
+    margin: 10px 0;
+    padding-left: 25px;
+    list-style-type: disc;
+}
+
+.result-content pre li {
+    margin: 5px 0;
+    line-height: 1.6;
+}
+
+.result-content pre strong {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.result-content pre em {
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+.result-content pre code {
+    background: var(--bg-tertiary);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+    color: var(--primary-color);
+}
+
+.result-content pre a {
+    color: var(--primary-color);
+    text-decoration: none;
+    border-bottom: 1px solid var(--primary-color);
+}
+
+.result-content pre a:hover {
+    color: var(--secondary-color);
+    border-bottom-color: var(--secondary-color);
+}
+
+.result-content pre img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    margin: 15px 0;
+    box-shadow: var(--shadow);
 }
 
 .result-actions {

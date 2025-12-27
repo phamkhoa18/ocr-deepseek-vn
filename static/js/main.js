@@ -141,12 +141,15 @@ async function processOCR() {
             // Hiển thị kết quả với format phù hợp
             const text = data.text || 'Không có kết quả';
             
-            // Nếu là markdown, render đẹp hơn
-            if (data.format === 'markdown' && text.includes('##') || text.includes('**')) {
-                // Render markdown cơ bản
+            // Nếu là markdown hoặc có markdown syntax, render đẹp
+            if (data.format === 'markdown' || text.includes('##') || text.includes('**') || text.includes('- ')) {
+                // Render markdown với HTML
                 resultText.innerHTML = formatMarkdown(text);
+                resultText.style.fontFamily = 'inherit'; // Dùng font mặc định cho markdown
             } else {
+                // Text thuần, dùng pre để giữ format
                 resultText.textContent = text;
+                resultText.style.fontFamily = 'Courier New, monospace';
             }
             
             resultSection.style.display = 'block';
@@ -164,14 +167,38 @@ async function processOCR() {
 }
 
 function formatMarkdown(text) {
-    // Basic markdown rendering
+    // Enhanced markdown rendering với layout đẹp
     let html = text
+        // Headers
+        .replace(/^#### (.*$)/gim, '<h4>$1</h4>')
         .replace(/^### (.*$)/gim, '<h3>$1</h3>')
         .replace(/^## (.*$)/gim, '<h2>$1</h2>')
         .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+        // Bold và italic
         .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
         .replace(/\*(.*?)\*/gim, '<em>$1</em>')
+        // Lists
+        .replace(/^\- (.*$)/gim, '<li>$1</li>')
+        .replace(/^(\d+)\. (.*$)/gim, '<li>$2</li>')
+        // Code blocks
+        .replace(/`([^`]+)`/gim, '<code>$1</code>')
+        // Links
+        .replace(/\[([^\]]+)\]\(([^\)]+)\)/gim, '<a href="$2" target="_blank">$1</a>')
+        // Images
+        .replace(/!\[([^\]]*)\]\(([^\)]+)\)/gim, '<img src="$2" alt="$1" style="max-width: 100%;">')
+        // Line breaks - giữ layout
+        .replace(/\n\n/g, '</p><p>')
         .replace(/\n/g, '<br>');
+    
+    // Wrap lists
+    html = html.replace(/(<li>.*?<\/li>)/gim, '<ul>$1</ul>');
+    html = html.replace(/<\/ul>\s*<ul>/gim, '');
+    
+    // Wrap paragraphs
+    if (!html.startsWith('<h') && !html.startsWith('<ul') && !html.startsWith('<li')) {
+        html = '<p>' + html + '</p>';
+    }
+    
     return html;
 }
 
