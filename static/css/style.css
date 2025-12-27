@@ -373,9 +373,7 @@ header h1 i {
     overflow-y: auto;
 }
 
-.result-content pre {
-    white-space: pre-wrap;
-    word-wrap: break-word;
+.result-text {
     color: var(--text-primary);
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     font-size: 1rem;
@@ -384,8 +382,17 @@ header h1 i {
     padding: 0;
 }
 
+/* Text mode - dùng pre để giữ format */
+.result-text.text-mode {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-family: 'Courier New', monospace;
+    font-size: 0.95rem;
+    line-height: 1.6;
+}
+
 /* Markdown rendering styles */
-.result-content pre h1 {
+.result-text h1 {
     color: var(--primary-color);
     margin: 20px 0 15px 0;
     font-weight: 700;
@@ -394,7 +401,7 @@ header h1 i {
     padding-bottom: 10px;
 }
 
-.result-content pre h2 {
+.result-text h2 {
     color: var(--primary-color);
     margin: 18px 0 12px 0;
     font-weight: 600;
@@ -403,47 +410,52 @@ header h1 i {
     padding-bottom: 8px;
 }
 
-.result-content pre h3 {
+.result-text h3 {
     color: var(--primary-color);
     margin: 15px 0 10px 0;
     font-weight: 600;
     font-size: 1.3rem;
 }
 
-.result-content pre h4 {
+.result-text h4 {
     color: var(--text-primary);
     margin: 12px 0 8px 0;
     font-weight: 600;
     font-size: 1.1rem;
 }
 
-.result-content pre p {
+.result-text p {
     margin: 8px 0;
     line-height: 1.8;
 }
 
-.result-content pre ul {
+.result-text ul {
     margin: 10px 0;
     padding-left: 25px;
     list-style-type: disc;
 }
 
-.result-content pre li {
+.result-text ol {
+    margin: 10px 0;
+    padding-left: 25px;
+}
+
+.result-text li {
     margin: 5px 0;
     line-height: 1.6;
 }
 
-.result-content pre strong {
+.result-text strong {
     color: var(--text-primary);
     font-weight: 600;
 }
 
-.result-content pre em {
+.result-text em {
     color: var(--text-secondary);
     font-style: italic;
 }
 
-.result-content pre code {
+.result-text code {
     background: var(--bg-tertiary);
     padding: 2px 6px;
     border-radius: 4px;
@@ -452,23 +464,57 @@ header h1 i {
     color: var(--primary-color);
 }
 
-.result-content pre a {
+.result-text a {
     color: var(--primary-color);
     text-decoration: none;
     border-bottom: 1px solid var(--primary-color);
+    transition: all 0.3s ease;
 }
 
-.result-content pre a:hover {
+.result-text a:hover {
     color: var(--secondary-color);
     border-bottom-color: var(--secondary-color);
 }
 
-.result-content pre img {
+.result-text img {
     max-width: 100%;
     height: auto;
     border-radius: 8px;
     margin: 15px 0;
     box-shadow: var(--shadow);
+}
+
+.result-text blockquote {
+    border-left: 4px solid var(--primary-color);
+    padding-left: 15px;
+    margin: 15px 0;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+.result-text table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 15px 0;
+}
+
+.result-text table th,
+.result-text table td {
+    border: 1px solid var(--border-color);
+    padding: 8px 12px;
+    text-align: left;
+}
+
+.result-text table th {
+    background: var(--bg-tertiary);
+    font-weight: 600;
+    color: var(--primary-color);
+}
+
+.result-text hr {
+    border: none;
+    border-top: 2px solid var(--border-color);
+    margin: 20px 0;
 }
 
 .result-actions {

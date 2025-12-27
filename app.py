@@ -11,8 +11,13 @@ from config import *
 from transformers import AutoModel, AutoTokenizer
 
 def format_ocr_result(text, output_format='markdown'):
-    """Format OCR result với layout đẹp"""
+    """Format OCR result - Giữ nguyên output từ DeepSeek-OCR"""
     if not text:
+        return text
+    
+    # Nếu output đã là markdown sạch (không có tags), giữ nguyên 100%
+    if output_format == 'markdown' and '<|ref|>' not in text and '<|det|>' not in text:
+        # Đã là markdown sạch từ model, giữ nguyên hoàn toàn
         return text
     
     # Nếu có <|ref|> và <|det|> tags (grounding format)
@@ -27,7 +32,7 @@ def format_ocr_result(text, output_format='markdown'):
             # Chỉ lấy text, bỏ tags
             return extract_text_only(text)
     else:
-        # Không có tags, trả về nguyên bản
+        # Không có tags, trả về nguyên bản (có thể đã là markdown)
         return text
 
 def format_to_markdown(text):
@@ -405,9 +410,10 @@ def ocr():
         prompt_text = request.form.get('prompt', '').strip()
         output_format = request.form.get('format', 'markdown')  # markdown, text, full
         
-        # Chọn prompt phù hợp với format
+        # Chọn prompt phù hợp với format - Dùng đúng prompt như DeepSeek-OCR công bố
         if not prompt_text:
             if output_format == 'markdown':
+                # Prompt chính xác như DeepSeek-OCR công bố
                 prompt_text = '<image>\n<|grounding|>Convert the document to markdown.'
             elif output_format == 'full':
                 prompt_text = '<image>\n<|grounding|>OCR this image.'
@@ -586,16 +592,14 @@ def ocr():
             except Exception as e:
                 print(f"⚠️  Không thể đọc file mới nhất: {e}")
         
-        # Clean up và format result text
+        # Clean up và format result text - Giữ nguyên output từ DeepSeek-OCR
         if result_text:
+            # Chỉ strip đầu cuối, giữ nguyên mọi thứ bên trong
             result_text = result_text.strip()
             
-            # Parse và format kết quả đẹp hơn nếu có <|ref|> và <|det|> tags
-            if '<|ref|>' in result_text or '<|det|>' in result_text:
-                # Format với layout info
-                formatted_text = format_ocr_result(result_text, output_format)
-            else:
-                formatted_text = result_text
+            # Format chỉ khi cần (có tags hoặc format khác markdown)
+            # Nếu đã là markdown sạch, giữ nguyên 100%
+            formatted_text = format_ocr_result(result_text, output_format)
         else:
             formatted_text = "Không tìm thấy kết quả. Vui lòng kiểm tra logs."
             print(f"⚠️  Không tìm thấy kết quả. Output path: {output_path}")

@@ -141,15 +141,17 @@ async function processOCR() {
             // Hiển thị kết quả với format phù hợp
             const text = data.text || 'Không có kết quả';
             
+            // Xóa class cũ
+            resultText.classList.remove('text-mode');
+            
             // Nếu là markdown hoặc có markdown syntax, render đẹp
-            if (data.format === 'markdown' || text.includes('##') || text.includes('**') || text.includes('- ')) {
+            if (data.format === 'markdown' || text.includes('##') || text.includes('**') || text.includes('- ') || text.includes('```')) {
                 // Render markdown với HTML
                 resultText.innerHTML = formatMarkdown(text);
-                resultText.style.fontFamily = 'inherit'; // Dùng font mặc định cho markdown
             } else {
-                // Text thuần, dùng pre để giữ format
+                // Text thuần, dùng text mode
                 resultText.textContent = text;
-                resultText.style.fontFamily = 'Courier New, monospace';
+                resultText.classList.add('text-mode');
             }
             
             resultSection.style.display = 'block';
@@ -167,39 +169,131 @@ async function processOCR() {
 }
 
 function formatMarkdown(text) {
-    // Enhanced markdown rendering với layout đẹp
-    let html = text
-        // Headers
-        .replace(/^#### (.*$)/gim, '<h4>$1</h4>')
-        .replace(/^### (.*$)/gim, '<h3>$1</h3>')
-        .replace(/^## (.*$)/gim, '<h2>$1</h2>')
-        .replace(/^# (.*$)/gim, '<h1>$1</h1>')
-        // Bold và italic
-        .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
-        .replace(/\*(.*?)\*/gim, '<em>$1</em>')
-        // Lists
-        .replace(/^\- (.*$)/gim, '<li>$1</li>')
-        .replace(/^(\d+)\. (.*$)/gim, '<li>$2</li>')
-        // Code blocks
-        .replace(/`([^`]+)`/gim, '<code>$1</code>')
-        // Links
-        .replace(/\[([^\]]+)\]\(([^\)]+)\)/gim, '<a href="$2" target="_blank">$1</a>')
-        // Images
-        .replace(/!\[([^\]]*)\]\(([^\)]+)\)/gim, '<img src="$2" alt="$1" style="max-width: 100%;">')
-        // Line breaks - giữ layout
-        .replace(/\n\n/g, '</p><p>')
-        .replace(/\n/g, '<br>');
+    // Enhanced markdown rendering - Giữ layout như DeepSeek-OCR
+    let html = text;
     
-    // Wrap lists
-    html = html.replace(/(<li>.*?<\/li>)/gim, '<ul>$1</ul>');
-    html = html.replace(/<\/ul>\s*<ul>/gim, '');
+    // Code blocks (phải xử lý trước để không bị ảnh hưởng)
+    html = html.replace(/```([\s\S]*?)```/gim, '<pre><code>$1</code></pre>');
     
-    // Wrap paragraphs
-    if (!html.startsWith('<h') && !html.startsWith('<ul') && !html.startsWith('<li')) {
-        html = '<p>' + html + '</p>';
+    // Inline code
+    html = html.replace(/`([^`\n]+)`/gim, '<code>$1</code>');
+    
+    // Headers (từ lớn đến nhỏ)
+    html = html.replace(/^###### (.*$)/gim, '<h6>$1</h6>');
+    html = html.replace(/^##### (.*$)/gim, '<h5>$1</h5>');
+    html = html.replace(/^#### (.*$)/gim, '<h4>$1</h4>');
+    html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
+    html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
+    html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
+    
+    // Horizontal rules
+    html = html.replace(/^---$/gim, '<hr>');
+    html = html.replace(/^\*\*\*$/gim, '<hr>');
+    
+    // Bold và italic (bold trước)
+    html = html.replace(/\*\*\*(.*?)\*\*\*/gim, '<strong><em>$1</em></strong>');
+    html = html.replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>');
+    html = html.replace(/\*(.*?)\*/gim, '<em>$1</em>');
+    
+    // Links
+    html = html.replace(/\[([^\]]+)\]\(([^\)]+)\)/gim, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    
+    // Images
+    html = html.replace(/!\[([^\]]*)\]\(([^\)]+)\)/gim, '<img src="$2" alt="$1">');
+    
+    // Lists - xử lý từng dòng
+    const lines = html.split('\n');
+    let result = [];
+    let inList = false;
+    let listType = 'ul';
+    
+    for (let i = 0; i < lines.length; i++) {
+        let line = lines[i];
+        const trimmed = line.trim();
+        
+        // Ordered list
+        if (/^\d+\.\s/.test(trimmed)) {
+            if (!inList || listType !== 'ol') {
+                if (inList) result.push(`</${listType}>`);
+                result.push('<ol>');
+                inList = true;
+                listType = 'ol';
+            }
+            result.push('<li>' + trimmed.replace(/^\d+\.\s/, '') + '</li>');
+        }
+        // Unordered list
+        else if (/^[\-\*\+]\s/.test(trimmed)) {
+            if (!inList || listType !== 'ul') {
+                if (inList) result.push(`</${listType}>`);
+                result.push('<ul>');
+                inList = true;
+                listType = 'ul';
+            }
+            result.push('<li>' + trimmed.replace(/^[\-\*\+]\s/, '') + '</li>');
+        }
+        // Not a list item
+        else {
+            if (inList) {
+                result.push(`</${listType}>`);
+                inList = false;
+            }
+            if (trimmed) {
+                result.push(line);
+            } else {
+                result.push('');
+            }
+        }
     }
     
-    return html;
+    if (inList) {
+        result.push(`</${listType}>`);
+    }
+    
+    html = result.join('\n');
+    
+    // Blockquotes
+    html = html.replace(/^>\s(.*$)/gim, '<blockquote>$1</blockquote>');
+    
+    // Paragraphs - wrap text không phải block elements
+    const finalLines = html.split('\n');
+    let finalResult = [];
+    let inParagraph = false;
+    
+    for (let i = 0; i < finalLines.length; i++) {
+        const line = finalLines[i].trim();
+        
+        if (!line) {
+            if (inParagraph) {
+                finalResult.push('</p>');
+                inParagraph = false;
+            }
+            continue;
+        }
+        
+        // Block elements không wrap trong paragraph
+        if (line.match(/^<(h[1-6]|ul|ol|li|pre|blockquote|hr|img|table)/) || 
+            line.match(/^<\/?(ul|ol|li|pre|blockquote|hr|table)/)) {
+            if (inParagraph) {
+                finalResult.push('</p>');
+                inParagraph = false;
+            }
+            finalResult.push(line);
+        } else {
+            if (!inParagraph) {
+                finalResult.push('<p>');
+                inParagraph = true;
+            } else {
+                finalResult.push('<br>');
+            }
+            finalResult.push(line);
+        }
+    }
+    
+    if (inParagraph) {
+        finalResult.push('</p>');
+    }
+    
+    return finalResult.join('\n');
 }
 
 function copyResult() {
