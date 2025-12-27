@@ -11,6 +11,8 @@ const resultSection = document.getElementById('resultSection');
 const resultText = document.getElementById('resultText');
 const copyBtn = document.getElementById('copyBtn');
 const downloadBtn = document.getElementById('downloadBtn');
+const downloadMarkdownBtn = document.getElementById('downloadMarkdownBtn');
+const downloadDocxBtn = document.getElementById('downloadDocxBtn');
 const loadingOverlay = document.getElementById('loadingOverlay');
 const exampleBtns = document.querySelectorAll('.example-btn');
 
@@ -27,6 +29,12 @@ processBtn.addEventListener('click', processOCR);
 clearBtn.addEventListener('click', clearAll);
 copyBtn.addEventListener('click', copyResult);
 downloadBtn.addEventListener('click', downloadResult);
+if (downloadMarkdownBtn) {
+    downloadMarkdownBtn.addEventListener('click', downloadMarkdown);
+}
+if (downloadDocxBtn) {
+    downloadDocxBtn.addEventListener('click', downloadDocx);
+}
 
 // Example buttons
 exampleBtns.forEach(btn => {
@@ -144,14 +152,27 @@ async function processOCR() {
             // Xóa class cũ
             resultText.classList.remove('text-mode');
             
+            // Lưu raw text để download
+            resultText.setAttribute('data-raw', data.raw_text || text);
+            
             // Nếu là markdown hoặc có markdown syntax, render đẹp
             if (data.format === 'markdown' || text.includes('##') || text.includes('**') || text.includes('- ') || text.includes('```')) {
                 // Render markdown với HTML
                 resultText.innerHTML = formatMarkdown(text);
+                // Hiện buttons cho markdown
+                document.getElementById('downloadMarkdownBtn').style.display = 'inline-flex';
+                document.getElementById('downloadDocxBtn').style.display = 'inline-flex';
+                
+                // Load images sau khi render
+                setTimeout(() => {
+                    loadImages();
+                }, 100);
             } else {
                 // Text thuần, dùng text mode
                 resultText.textContent = text;
                 resultText.classList.add('text-mode');
+                document.getElementById('downloadMarkdownBtn').style.display = 'none';
+                document.getElementById('downloadDocxBtn').style.display = 'none';
             }
             
             resultSection.style.display = 'block';

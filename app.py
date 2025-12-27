@@ -1,7 +1,7 @@
 import os
 import torch
 import re
-from flask import Flask, request, jsonify, render_template, send_from_directory
+from flask import Flask, request, jsonify, render_template, send_from_directory, send_file
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from PIL import Image
@@ -376,6 +376,197 @@ def health():
         'cuda_available': torch.cuda.is_available()
     })
 
+@app.route('/outputs/<path:filename>')
+def serve_output(filename):
+    """Serve files from output directory (for images in markdown)"""
+    try:
+        return send_from_directory(OUTPUT_FOLDER, filename)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 404
+
+@app.route('/api/export-docx', methods=['POST'])
+def export_docx():
+    """Export markdown to DOCX with images"""
+    try:
+        from docx import Document
+        from docx.shared import Inches, Pt
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+        import markdown
+        from markdown.extensions import fenced_code, tables
+        import requests
+        from io import BytesIO
+        
+        data = request.get_json()
+        markdown_text = data.get('markdown', '')
+        filename = data.get('filename', 'ocr_result.docx')
+        
+        if not markdown_text:
+            return jsonify({'error': 'Không có nội dung markdown'}), 400
+        
+        # Tạo document
+        doc = Document()
+        
+        # Parse markdown line by line (đơn giản hơn)
+        lines = markdown_text.split('\n')
+        current_list = None
+        
+        for line in lines:
+            line_stripped = line.strip()
+            if not line_stripped:
+                current_list = None
+                continue
+            
+            # Headers
+            if line_stripped.startswith('# '):
+                doc.add_heading(line_stripped[2:], level=1)
+                current_list = None
+            elif line_stripped.startswith('## '):
+                doc.add_heading(line_stripped[3:], level=2)
+                current_list = None
+            elif line_stripped.startswith('### '):
+                doc.add_heading(line_stripped[4:], level=3)
+                current_list = None
+            elif line_stripped.startswith('#### '):
+                doc.add_heading(line_stripped[5:], level=4)
+                current_list = None
+            # Images
+            elif '![' in line_stripped:
+                img_match = re.search(r'!\[([^\]]*)\]\(([^\)]+)\)', line_stripped)
+                if img_match:
+                    img_path = img_match.group(2)
+                    if img_path.startswith('/outputs/'):
+                        img_path = os.path.join(OUTPUT_FOLDER, img_path.replace('/outputs/', ''))
+                    elif not os.path.isabs(img_path):
+                        img_path = os.path.join(OUTPUT_FOLDER, img_path)
+                    
+                    if os.path.exists(img_path):
+                        para = doc.add_paragraph()
+                        run = para.add_run()
+                        try:
+                            run.add_picture(img_path, width=Inches(5))
+                        except Exception as e:
+                            print(f"Error adding image {img_path}: {e}")
+                    else:
+                        doc.add_paragraph(f"[Image: {img_match.group(1)}]")
+                current_list = None
+            # Lists
+            elif line_stripped.startswith('- ') or line_stripped.startswith('* '):
+                if current_list != 'ul':
+                    current_list = 'ul'
+                para = doc.add_paragraph(line_stripped[2:], style='List Bullet')
+            elif re.match(r'^\d+\.\s', line_stripped):
+                if current_list != 'ol':
+                    current_list = 'ol'
+                para = doc.add_paragraph(re.sub(r'^\d+\.\s', '', line_stripped), style='List Number')
+            # Code blocks
+            elif line_stripped.startswith('```'):
+                continue
+            # Regular text
+            else:
+                # Remove markdown formatting
+                text = re.sub(r'\*\*(.*?)\*\*', r'\1', line_stripped)  # Bold
+                text = re.sub(r'\*(.*?)\*', r'\1', text)  # Italic
+                text = re.sub(r'`([^`]+)`', r'\1', text)  # Code
+                para = doc.add_paragraph(text)
+                current_list = None
+        
+        # Skip HTML parser, use simple markdown parsing instead
+        from html.parser import HTMLParser
+        
+        class DocxHTMLParser(HTMLParser):
+            def __init__(self, doc):
+                super().__init__()
+                self.doc = doc
+                self.current_para = None
+                self.current_run = None
+                self.in_code = False
+                self.in_pre = False
+                
+            def handle_starttag(self, tag, attrs):
+                if tag == 'h1':
+                    self.current_para = self.doc.add_heading('', level=1)
+                elif tag == 'h2':
+                    self.current_para = self.doc.add_heading('', level=2)
+                elif tag == 'h3':
+                    self.current_para = self.doc.add_heading('', level=3)
+                elif tag == 'h4':
+                    self.current_para = self.doc.add_heading('', level=4)
+                elif tag == 'p':
+                    self.current_para = self.doc.add_paragraph()
+                elif tag == 'strong':
+                    if self.current_para:
+                        self.current_run = self.current_para.add_run()
+                        self.current_run.bold = True
+                elif tag == 'em':
+                    if self.current_para:
+                        self.current_run = self.current_para.add_run()
+                        self.current_run.italic = True
+                elif tag == 'code':
+                    self.in_code = True
+                elif tag == 'img':
+                    # Lấy src từ attrs
+                    src = dict(attrs).get('src', '')
+                    if src:
+                        try:
+                            # Download image
+                            if src.startswith('/'):
+                                # Local file
+                                img_path = os.path.join(OUTPUT_FOLDER, src.replace('/outputs/', ''))
+                                if os.path.exists(img_path):
+                                    self.current_para = self.doc.add_paragraph()
+                                    run = self.current_para.add_run()
+                                    run.add_picture(img_path, width=Inches(5))
+                        except Exception as e:
+                            print(f"Error adding image: {e}")
+                elif tag == 'ul' or tag == 'ol':
+                    self.current_para = self.doc.add_paragraph()
+                elif tag == 'li':
+                    if self.current_para:
+                        self.current_para.style = 'List Bullet' if tag == 'ul' else 'List Number'
+                
+            def handle_endtag(self, tag):
+                if tag in ['h1', 'h2', 'h3', 'h4', 'p']:
+                    self.current_para = None
+                    self.current_run = None
+                elif tag == 'strong' or tag == 'em':
+                    self.current_run = None
+                elif tag == 'code':
+                    self.in_code = False
+                    
+            def handle_data(self, data):
+                if self.in_pre or self.in_code:
+                    if self.current_para:
+                        run = self.current_para.add_run(data)
+                        run.font.name = 'Courier New'
+                else:
+                    if self.current_run:
+                        self.current_run.add_text(data)
+                    elif self.current_para:
+                        self.current_para.add_run(data)
+                    else:
+                        self.current_para = self.doc.add_paragraph()
+                        self.current_para.add_run(data)
+        
+        parser = DocxHTMLParser(doc)
+        parser.feed(html)
+        
+        # Save to BytesIO
+        output = BytesIO()
+        doc.save(output)
+        output.seek(0)
+        
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            as_attachment=True,
+            download_name=filename
+        )
+        
+    except ImportError:
+        return jsonify({'error': 'python-docx chưa được cài đặt. Chạy: pip install python-docx markdown'}), 500
+    except Exception as e:
+        return jsonify({'error': f'Lỗi khi tạo DOCX: {str(e)}'}), 500
+
 @app.route('/api/ocr', methods=['POST'])
 def ocr():
     """Process OCR request"""
@@ -490,19 +681,25 @@ def ocr():
         # Nếu output_path là directory, tìm file .txt bên trong
         if os.path.isdir(output_path):
             print(f"📁 Output path là directory: {output_path}")
-            # Tìm file .txt trong directory
+            # Tìm file .mmd (markdown) trước, sau đó .txt
             for f in os.listdir(output_path):
-                if f.endswith('.txt'):
+                if f.endswith('.mmd'):
                     possible_files.append(os.path.join(output_path, f))
-            # Nếu không có .txt, lấy tất cả files
+            # Nếu không có .mmd, tìm .txt
+            if not possible_files:
+                for f in os.listdir(output_path):
+                    if f.endswith('.txt'):
+                        possible_files.append(os.path.join(output_path, f))
+            # Nếu vẫn không có, lấy tất cả text files (không phải image)
             if not possible_files:
                 for f in os.listdir(output_path):
                     filepath_full = os.path.join(output_path, f)
-                    if os.path.isfile(filepath_full):
+                    if os.path.isfile(filepath_full) and not f.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp')):
                         possible_files.append(filepath_full)
         else:
             # Nếu là file, thử các extension
             possible_files = [
+                f"{output_path}.mmd",
                 f"{output_path}.txt",
                 f"{output_path}",
             ]
@@ -515,9 +712,9 @@ def ocr():
                 item_path = os.path.join(output_dir, item)
                 # Nếu là directory có chứa filename
                 if os.path.isdir(item_path) and filename in item:
-                    # Tìm file .txt trong directory này
+                    # Tìm file .mmd hoặc .txt trong directory này
                     for f in os.listdir(item_path):
-                        if f.endswith('.txt'):
+                        if f.endswith('.mmd') or f.endswith('.txt'):
                             filepath_full = os.path.join(item_path, f)
                             if os.path.isfile(filepath_full):
                                 all_files.append((filepath_full, os.path.getmtime(filepath_full)))
@@ -574,7 +771,7 @@ def ocr():
                     elif os.path.isdir(item_path):
                         # Tìm file .txt trong directory
                         for f in os.listdir(item_path):
-                            if f.endswith('.txt'):
+                            if f.endswith('.mmd') or f.endswith('.txt'):
                                 filepath_full = os.path.join(item_path, f)
                                 if os.path.isfile(filepath_full):
                                     all_items.append((filepath_full, os.path.getmtime(filepath_full), 'file'))
@@ -596,6 +793,23 @@ def ocr():
         if result_text:
             # Chỉ strip đầu cuối, giữ nguyên mọi thứ bên trong
             result_text = result_text.strip()
+            
+            # Sửa image paths trong markdown để trỏ đúng output directory
+            if output_format == 'markdown' and os.path.isdir(output_path):
+                # Tìm tên directory để build path
+                output_dir_name = os.path.basename(output_path)
+                # Sửa image paths: images/0.jpg -> /outputs/{output_dir_name}/0.jpg
+                result_text = re.sub(
+                    r'!\[([^\]]*)\]\(images/([^\)]+)\)',
+                    lambda m: f'![{m.group(1)}](/outputs/{output_dir_name}/{m.group(2)})',
+                    result_text
+                )
+                # Sửa relative paths khác
+                result_text = re.sub(
+                    r'!\[([^\]]*)\]\(([^/\)]+\.(jpg|jpeg|png|gif|bmp|webp))\)',
+                    lambda m: f'![{m.group(1)}](/outputs/{output_dir_name}/{m.group(2)})',
+                    result_text
+                )
             
             # Format chỉ khi cần (có tags hoặc format khác markdown)
             # Nếu đã là markdown sạch, giữ nguyên 100%
@@ -712,19 +926,25 @@ def ocr_base64():
         # Nếu output_path là directory, tìm file .txt bên trong
         if os.path.isdir(output_path):
             print(f"📁 Output path là directory: {output_path}")
-            # Tìm file .txt trong directory
+            # Tìm file .mmd (markdown) trước, sau đó .txt
             for f in os.listdir(output_path):
-                if f.endswith('.txt'):
+                if f.endswith('.mmd'):
                     possible_files.append(os.path.join(output_path, f))
-            # Nếu không có .txt, lấy tất cả files
+            # Nếu không có .mmd, tìm .txt
+            if not possible_files:
+                for f in os.listdir(output_path):
+                    if f.endswith('.txt'):
+                        possible_files.append(os.path.join(output_path, f))
+            # Nếu vẫn không có, lấy tất cả text files (không phải image)
             if not possible_files:
                 for f in os.listdir(output_path):
                     filepath_full = os.path.join(output_path, f)
-                    if os.path.isfile(filepath_full):
+                    if os.path.isfile(filepath_full) and not f.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp')):
                         possible_files.append(filepath_full)
         else:
             # Nếu là file, thử các extension
             possible_files = [
+                f"{output_path}.mmd",
                 f"{output_path}.txt",
                 f"{output_path}",
             ]
@@ -736,9 +956,9 @@ def ocr_base64():
                 item_path = os.path.join(OUTPUT_FOLDER, item)
                 # Nếu là directory có chứa temp_filename
                 if os.path.isdir(item_path) and temp_filename in item:
-                    # Tìm file .txt trong directory này
+                    # Tìm file .mmd hoặc .txt trong directory này
                     for f in os.listdir(item_path):
-                        if f.endswith('.txt'):
+                        if f.endswith('.mmd') or f.endswith('.txt'):
                             filepath_full = os.path.join(item_path, f)
                             if os.path.isfile(filepath_full):
                                 all_files.append((filepath_full, os.path.getmtime(filepath_full)))
@@ -793,7 +1013,7 @@ def ocr_base64():
                     elif os.path.isdir(item_path):
                         # Tìm file .txt trong directory
                         for f in os.listdir(item_path):
-                            if f.endswith('.txt'):
+                            if f.endswith('.mmd') or f.endswith('.txt'):
                                 filepath_full = os.path.join(item_path, f)
                                 if os.path.isfile(filepath_full):
                                     all_items.append((filepath_full, os.path.getmtime(filepath_full), 'file'))

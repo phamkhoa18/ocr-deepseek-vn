@@ -367,10 +367,30 @@ header h1 i {
 .result-content {
     background: var(--bg-color);
     border-radius: 10px;
-    padding: 20px;
+    padding: 30px;
     margin-bottom: 15px;
-    max-height: 500px;
+    max-height: 800px;
     overflow-y: auto;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* Scrollbar đẹp */
+.result-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.result-content::-webkit-scrollbar-track {
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+}
+
+.result-content::-webkit-scrollbar-thumb {
+    background: var(--primary-color);
+    border-radius: 4px;
+}
+
+.result-content::-webkit-scrollbar-thumb:hover {
+    background: var(--secondary-color);
 }
 
 .result-text {
@@ -380,6 +400,21 @@ header h1 i {
     line-height: 1.8;
     margin: 0;
     padding: 0;
+    max-width: 100%;
+}
+
+/* Document-like layout */
+.result-text {
+    background: white;
+    padding: 40px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+@media (max-width: 768px) {
+    .result-text {
+        padding: 20px;
+    }
 }
 
 /* Text mode - dùng pre để giữ format */
@@ -480,8 +515,18 @@ header h1 i {
     max-width: 100%;
     height: auto;
     border-radius: 8px;
-    margin: 15px 0;
-    box-shadow: var(--shadow);
+    margin: 20px auto;
+    display: block;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    border: 1px solid var(--border-color);
+    background: white;
+    padding: 5px;
+}
+
+.result-text img:hover {
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+    transform: scale(1.02);
+    transition: all 0.3s ease;
 }
 
 .result-text blockquote {
