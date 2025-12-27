@@ -50,14 +50,33 @@ def init_model():
         print("Lưu ý: Model sẽ được tải từ Hugging Face (~20-30GB)")
         
         # Kiểm tra và cài flash-attn nếu cần (để có LlamaFlashAttention2)
+        has_flash_attn = False
         try:
             import flash_attn
+            has_flash_attn = True
             print("✅ flash-attn đã được cài đặt")
         except ImportError:
-            print("⚠️  flash-attn chưa được cài. Model code có thể cần nó.")
-            print("   Đang thử tải model mà không dùng flash attention...")
+            print("⚠️  flash-attn chưa được cài.")
+            print("   Đang thử tải model với transformers mặc định...")
         
-        # Thử load model - model code sẽ tự xử lý flash attention
+        # Patch để bypass flash attention nếu cần
+        if not has_flash_attn:
+            try:
+                # Thử import từ transformers trước
+                from transformers.models.llama import modeling_llama
+                if not hasattr(modeling_llama, 'LlamaFlashAttention2'):
+                    print("⚠️  LlamaFlashAttention2 không có trong transformers.")
+                    print("   Đang tạo workaround...")
+                    # Tạo class giả để model code không bị lỗi import
+                    class FakeLlamaFlashAttention2:
+                        def __init__(self, *args, **kwargs):
+                            pass
+                    modeling_llama.LlamaFlashAttention2 = FakeLlamaFlashAttention2
+                    print("✅ Đã tạo workaround cho flash attention")
+            except Exception as e:
+                print(f"⚠️  Không thể patch: {e}")
+        
+        # Thử load model
         try:
             # Không chỉ định _attn_implementation để model tự quyết định
             model = AutoModel.from_pretrained(
@@ -68,12 +87,18 @@ def init_model():
         except Exception as e:
             error_msg = str(e)
             if "LlamaFlashAttention2" in error_msg or "flash" in error_msg.lower():
-                print("\n⚠️  Lỗi liên quan đến flash attention.")
-                print("💡 Giải pháp: Cài flash-attn hoặc cập nhật transformers")
-                print("\nChạy lệnh sau để khắc phục:")
-                print("  pip install flash-attn==2.7.3 --no-build-isolation")
-                print("  hoặc")
-                print("  pip install --upgrade transformers>=4.46.0")
+                print("\n" + "="*60)
+                print("⚠️  Lỗi liên quan đến flash attention.")
+                print("="*60)
+                print("\n💡 Giải pháp:")
+                print("\n1. Cài wheel và flash-attn:")
+                print("   pip install wheel")
+                print("   pip install flash-attn==2.7.3 --no-build-isolation")
+                print("\n2. Hoặc cập nhật transformers:")
+                print("   pip install --upgrade transformers>=4.51.0 accelerate")
+                print("\n3. Hoặc cài từ pre-built wheel:")
+                print("   pip install flash-attn --no-build-isolation")
+                print("="*60)
                 raise Exception(f"Model yêu cầu flash-attn hoặc transformers mới hơn. Lỗi: {error_msg}")
             else:
                 raise Exception(f"Không thể tải model: {error_msg}")
