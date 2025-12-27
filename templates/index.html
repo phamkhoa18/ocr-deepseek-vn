@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeepSeek-OCR - Nhận dạng văn bản từ ảnh</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-eye"></i> DeepSeek-OCR</h1>
+            <p class="subtitle">Nhận dạng văn bản từ ảnh với AI</p>
+        </header>
+
+        <div class="main-content">
+            <div class="upload-section">
+                <div class="upload-box" id="uploadBox">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    <p>Kéo thả ảnh vào đây hoặc <span class="browse-link">chọn file</span></p>
+                    <p class="file-info">Hỗ trợ: PNG, JPG, JPEG, PDF, GIF, BMP, WEBP (tối đa 16MB)</p>
+                    <input type="file" id="fileInput" accept="image/*,.pdf" hidden>
+                </div>
+                
+                <div class="preview-section" id="previewSection" style="display: none;">
+                    <div class="image-preview">
+                        <img id="previewImage" src="" alt="Preview">
+                        <button class="remove-btn" id="removeBtn"><i class="fas fa-times"></i></button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="prompt-section">
+                <label for="promptInput">
+                    <i class="fas fa-comment-alt"></i> Prompt (Tùy chọn):
+                </label>
+                <div class="prompt-input-wrapper">
+                    <textarea 
+                        id="promptInput" 
+                        placeholder="Nhập prompt của bạn... (Để trống sẽ dùng 'Free OCR')"
+                        rows="3"
+                    ></textarea>
+                </div>
+                <div class="prompt-examples">
+                    <span class="example-label">Ví dụ:</span>
+                    <button class="example-btn" data-prompt='<image>\nFree OCR.'>Free OCR</button>
+                    <button class="example-btn" data-prompt='<image>\n<|grounding|>Convert the document to markdown.'>Convert to Markdown</button>
+                    <button class="example-btn" data-prompt='<image>\n<|grounding|>OCR this image.'>OCR Image</button>
+                    <button class="example-btn" data-prompt='<image>\nParse the figure.'>Parse Figure</button>
+                    <button class="example-btn" data-prompt='<image>\nDescribe this image in detail.'>Describe Image</button>
+                </div>
+            </div>
+
+            <div class="action-section">
+                <button class="process-btn" id="processBtn" disabled>
+                    <i class="fas fa-magic"></i>
+                    <span>Xử lý OCR</span>
+                </button>
+                <button class="clear-btn" id="clearBtn">
+                    <i class="fas fa-redo"></i>
+                    <span>Xóa tất cả</span>
+                </button>
+            </div>
+
+            <div class="result-section" id="resultSection" style="display: none;">
+                <div class="result-header">
+                    <h2><i class="fas fa-file-alt"></i> Kết quả OCR</h2>
+                    <button class="copy-btn" id="copyBtn">
+                        <i class="fas fa-copy"></i> Sao chép
+                    </button>
+                </div>
+                <div class="result-content">
+                    <pre id="resultText"></pre>
+                </div>
+                <div class="result-actions">
+                    <button class="download-btn" id="downloadBtn">
+                        <i class="fas fa-download"></i> Tải xuống (.txt)
+                    </button>
+                </div>
+            </div>
+
+            <div class="loading-overlay" id="loadingOverlay" style="display: none;">
+                <div class="spinner"></div>
+                <p>Đang xử lý OCR...</p>
+                <p class="loading-subtitle">Vui lòng đợi trong giây lát</p>
+            </div>
+        </div>
+
+        <footer>
+            <p>Powered by <a href="https://github.com/deepseek-ai/DeepSeek-OCR" target="_blank">DeepSeek-OCR</a></p>
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
+
