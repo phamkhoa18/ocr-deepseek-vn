@@ -164,10 +164,42 @@ def init_model():
         model = model.eval()
         if torch.cuda.is_available() and DEVICE == 'cuda':
             print(f"Đang chuyển model lên GPU với dtype={DTYPE}...")
-            model = model.cuda().to(dtype)
+            print("⚠️  Quá trình này có thể mất 5-10 phút, vui lòng đợi...")
+            print("💡 Đang tải ~6.7GB weights lên GPU...")
+            
+            # Kiểm tra VRAM trước khi tải
+            torch.cuda.empty_cache()
+            free_memory = torch.cuda.get_device_properties(0).total_memory - torch.cuda.memory_allocated(0)
+            free_memory_gb = free_memory / (1024**3)
+            print(f"📊 VRAM còn trống: {free_memory_gb:.1f}GB")
+            
+            if free_memory_gb < 8:
+                print("⚠️  VRAM hơi ít, có thể mất nhiều thời gian hơn...")
+            
+            # Tải model lên GPU
+            try:
+                model = model.cuda()
+                print("✅ Model đã được chuyển lên GPU")
+                print("🔄 Đang chuyển đổi dtype...")
+                model = model.to(dtype)
+                print("✅ Dtype đã được chuyển đổi")
+            except RuntimeError as e:
+                if "out of memory" in str(e).lower():
+                    print("❌ Lỗi: Hết VRAM!")
+                    print("💡 Giải pháp: Giảm IMAGE_SIZE trong config.py hoặc dùng CPU")
+                    raise
+                else:
+                    raise
         else:
             print(f"Đang chuyển model lên CPU với dtype={DTYPE}...")
+            print("⚠️  Chạy trên CPU sẽ rất chậm (30-60s/ảnh)...")
             model = model.to(dtype)
+        
+        # Kiểm tra model đã sẵn sàng
+        torch.cuda.empty_cache()
+        if torch.cuda.is_available() and DEVICE == 'cuda':
+            allocated = torch.cuda.memory_allocated(0) / (1024**3)
+            print(f"📊 VRAM đã sử dụng: {allocated:.1f}GB")
         
         print("\n✅ Model đã được tải thành công!")
         print("=" * 60)
