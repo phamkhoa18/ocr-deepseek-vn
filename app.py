@@ -378,10 +378,35 @@ def health():
 
 @app.route('/outputs/<path:filename>')
 def serve_output(filename):
-    """Serve files from output directory (for images in markdown)"""
+    """Serve files from output directory (for images in markdown) - Support subdirectories"""
     try:
-        return send_from_directory(OUTPUT_FOLDER, filename)
+        # filename có thể là: "result_xxx.jpg/0.jpg" (subdirectory/file)
+        file_path = os.path.join(OUTPUT_FOLDER, filename)
+        
+        # Kiểm tra file có tồn tại không
+        if os.path.isfile(file_path):
+            # Serve file trực tiếp
+            directory = os.path.dirname(file_path)
+            file_name = os.path.basename(file_path)
+            return send_from_directory(directory, file_name)
+        else:
+            # Thử tìm trong các subdirectories
+            # filename format: "result_xxx.jpg/0.jpg"
+            parts = filename.split('/')
+            if len(parts) >= 2:
+                # Có subdirectory
+                subdir = parts[0]
+                subdir_path = os.path.join(OUTPUT_FOLDER, subdir)
+                if os.path.isdir(subdir_path):
+                    # Tìm file trong subdirectory
+                    file_name = '/'.join(parts[1:])  # Phần còn lại sau subdirectory
+                    file_path = os.path.join(subdir_path, file_name)
+                    if os.path.isfile(file_path):
+                        return send_from_directory(subdir_path, file_name)
+            
+            return jsonify({'error': f'File not found: {filename}'}), 404
     except Exception as e:
+        print(f"Error serving file {filename}: {e}")
         return jsonify({'error': str(e)}), 404
 
 @app.route('/api/export-docx', methods=['POST'])
