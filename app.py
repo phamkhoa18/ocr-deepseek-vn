@@ -432,32 +432,61 @@ def ocr():
         # Read result - try multiple methods
         result_text = ""
         
-        # Method 1: Try to read from output file (model.infer saves to file)
-        output_dir = OUTPUT_FOLDER
-        possible_files = [
-            f"{output_path}.txt",
-            f"{output_path}",
-            os.path.join(output_dir, f"result_{filename}.txt"),
-            os.path.join(output_dir, f"result_{filename}"),
-        ]
+        # Method 1: Kiểm tra xem output_path là directory hay file
+        possible_files = []
         
-        # Tìm file mới nhất trong output_dir có chứa filename
+        # Nếu output_path là directory, tìm file .txt bên trong
+        if os.path.isdir(output_path):
+            print(f"📁 Output path là directory: {output_path}")
+            # Tìm file .txt trong directory
+            for f in os.listdir(output_path):
+                if f.endswith('.txt'):
+                    possible_files.append(os.path.join(output_path, f))
+            # Nếu không có .txt, lấy tất cả files
+            if not possible_files:
+                for f in os.listdir(output_path):
+                    filepath_full = os.path.join(output_path, f)
+                    if os.path.isfile(filepath_full):
+                        possible_files.append(filepath_full)
+        else:
+            # Nếu là file, thử các extension
+            possible_files = [
+                f"{output_path}.txt",
+                f"{output_path}",
+            ]
+        
+        # Method 2: Tìm file mới nhất trong OUTPUT_FOLDER có chứa filename
+        output_dir = OUTPUT_FOLDER
         if os.path.exists(output_dir):
             all_files = []
-            for f in os.listdir(output_dir):
-                if filename in f or "result_" in f:
-                    filepath_full = os.path.join(output_dir, f)
-                    if os.path.isfile(filepath_full):
-                        all_files.append((filepath_full, os.path.getmtime(filepath_full)))
+            for item in os.listdir(output_dir):
+                item_path = os.path.join(output_dir, item)
+                # Nếu là directory có chứa filename
+                if os.path.isdir(item_path) and filename in item:
+                    # Tìm file .txt trong directory này
+                    for f in os.listdir(item_path):
+                        if f.endswith('.txt'):
+                            filepath_full = os.path.join(item_path, f)
+                            if os.path.isfile(filepath_full):
+                                all_files.append((filepath_full, os.path.getmtime(filepath_full)))
+                # Nếu là file có chứa filename
+                elif os.path.isfile(item_path) and (filename in item or "result_" in item):
+                    all_files.append((item_path, os.path.getmtime(item_path)))
             
             if all_files:
                 # Sắp xếp theo thời gian, lấy file mới nhất
                 all_files.sort(key=lambda x: x[1], reverse=True)
                 possible_files.insert(0, all_files[0][0])
         
+        # Method 3: Thêm các path khác
+        possible_files.extend([
+            os.path.join(output_dir, f"result_{filename}.txt"),
+            os.path.join(output_dir, f"result_{filename}"),
+        ])
+        
         # Thử đọc từ các file có thể
         for file_path in possible_files:
-            if os.path.exists(file_path):
+            if os.path.exists(file_path) and os.path.isfile(file_path):
                 try:
                     with open(file_path, 'r', encoding='utf-8') as f:
                         content = f.read().strip()
@@ -482,19 +511,32 @@ def ocr():
             else:
                 result_text = str(result) if result else ""
         
-        # Method 3: Nếu vẫn không có, tìm trong OUTPUT_FOLDER file mới nhất
+        # Method 4: Nếu vẫn không có, tìm trong OUTPUT_FOLDER file/directory mới nhất
         if not result_text and os.path.exists(OUTPUT_FOLDER):
             try:
-                files = [f for f in os.listdir(OUTPUT_FOLDER) if os.path.isfile(os.path.join(OUTPUT_FOLDER, f))]
-                if files:
+                all_items = []
+                for item in os.listdir(OUTPUT_FOLDER):
+                    item_path = os.path.join(OUTPUT_FOLDER, item)
+                    if os.path.isfile(item_path):
+                        all_items.append((item_path, os.path.getmtime(item_path), 'file'))
+                    elif os.path.isdir(item_path):
+                        # Tìm file .txt trong directory
+                        for f in os.listdir(item_path):
+                            if f.endswith('.txt'):
+                                filepath_full = os.path.join(item_path, f)
+                                if os.path.isfile(filepath_full):
+                                    all_items.append((filepath_full, os.path.getmtime(filepath_full), 'file'))
+                                    break
+                
+                if all_items:
                     # Lấy file mới nhất
-                    latest_file = max(files, key=lambda f: os.path.getmtime(os.path.join(OUTPUT_FOLDER, f)))
-                    latest_path = os.path.join(OUTPUT_FOLDER, latest_file)
+                    latest_item = max(all_items, key=lambda x: x[1])
+                    latest_path = latest_item[0]
                     with open(latest_path, 'r', encoding='utf-8') as f:
                         content = f.read().strip()
                         if content:
                             result_text = content
-                            print(f"✅ Đã đọc kết quả từ file mới nhất: {latest_file}")
+                            print(f"✅ Đã đọc kết quả từ file mới nhất: {os.path.basename(latest_path)}")
             except Exception as e:
                 print(f"⚠️  Không thể đọc file mới nhất: {e}")
         
@@ -614,36 +656,67 @@ def ocr_base64():
         # Read result - try multiple methods (same as ocr function)
         result_text = ""
         
-        # Method 1: Try to read from output file
-        possible_files = [
-            f"{output_path}.txt",
-            f"{output_path}",
-            os.path.join(OUTPUT_FOLDER, f"result_{temp_filename}.txt"),
-            os.path.join(OUTPUT_FOLDER, f"result_{temp_filename}"),
-        ]
+        # Method 1: Kiểm tra xem output_path là directory hay file
+        possible_files = []
         
-        # Tìm file mới nhất
+        # Nếu output_path là directory, tìm file .txt bên trong
+        if os.path.isdir(output_path):
+            print(f"📁 Output path là directory: {output_path}")
+            # Tìm file .txt trong directory
+            for f in os.listdir(output_path):
+                if f.endswith('.txt'):
+                    possible_files.append(os.path.join(output_path, f))
+            # Nếu không có .txt, lấy tất cả files
+            if not possible_files:
+                for f in os.listdir(output_path):
+                    filepath_full = os.path.join(output_path, f)
+                    if os.path.isfile(filepath_full):
+                        possible_files.append(filepath_full)
+        else:
+            # Nếu là file, thử các extension
+            possible_files = [
+                f"{output_path}.txt",
+                f"{output_path}",
+            ]
+        
+        # Method 2: Tìm file mới nhất trong OUTPUT_FOLDER có chứa temp_filename
         if os.path.exists(OUTPUT_FOLDER):
             all_files = []
-            for f in os.listdir(OUTPUT_FOLDER):
-                if temp_filename in f or "result_" in f:
-                    filepath_full = os.path.join(OUTPUT_FOLDER, f)
-                    if os.path.isfile(filepath_full):
-                        all_files.append((filepath_full, os.path.getmtime(filepath_full)))
+            for item in os.listdir(OUTPUT_FOLDER):
+                item_path = os.path.join(OUTPUT_FOLDER, item)
+                # Nếu là directory có chứa temp_filename
+                if os.path.isdir(item_path) and temp_filename in item:
+                    # Tìm file .txt trong directory này
+                    for f in os.listdir(item_path):
+                        if f.endswith('.txt'):
+                            filepath_full = os.path.join(item_path, f)
+                            if os.path.isfile(filepath_full):
+                                all_files.append((filepath_full, os.path.getmtime(filepath_full)))
+                # Nếu là file có chứa temp_filename
+                elif os.path.isfile(item_path) and (temp_filename in item or "result_" in item):
+                    all_files.append((item_path, os.path.getmtime(item_path)))
             
             if all_files:
                 all_files.sort(key=lambda x: x[1], reverse=True)
                 possible_files.insert(0, all_files[0][0])
         
+        # Method 3: Thêm các path khác
+        possible_files.extend([
+            os.path.join(OUTPUT_FOLDER, f"result_{temp_filename}.txt"),
+            os.path.join(OUTPUT_FOLDER, f"result_{temp_filename}"),
+        ])
+        
         for file_path in possible_files:
-            if os.path.exists(file_path):
+            if os.path.exists(file_path) and os.path.isfile(file_path):
                 try:
                     with open(file_path, 'r', encoding='utf-8') as f:
                         content = f.read().strip()
                         if content and len(content) > 10:
                             result_text = content
+                            print(f"✅ Đã đọc kết quả từ: {file_path}")
                             break
-                except:
+                except Exception as e:
+                    print(f"⚠️  Không thể đọc file {file_path}: {e}")
                     continue
         
         # Method 2: Try result object
@@ -659,6 +732,34 @@ def ocr_base64():
             else:
                 result_text = str(result) if result else ""
         
+        # Method 3: Tìm file mới nhất trong OUTPUT_FOLDER
+        if not result_text and os.path.exists(OUTPUT_FOLDER):
+            try:
+                all_items = []
+                for item in os.listdir(OUTPUT_FOLDER):
+                    item_path = os.path.join(OUTPUT_FOLDER, item)
+                    if os.path.isfile(item_path):
+                        all_items.append((item_path, os.path.getmtime(item_path), 'file'))
+                    elif os.path.isdir(item_path):
+                        # Tìm file .txt trong directory
+                        for f in os.listdir(item_path):
+                            if f.endswith('.txt'):
+                                filepath_full = os.path.join(item_path, f)
+                                if os.path.isfile(filepath_full):
+                                    all_items.append((filepath_full, os.path.getmtime(filepath_full), 'file'))
+                                    break
+                
+                if all_items:
+                    latest_item = max(all_items, key=lambda x: x[1])
+                    latest_path = latest_item[0]
+                    with open(latest_path, 'r', encoding='utf-8') as f:
+                        content = f.read().strip()
+                        if content:
+                            result_text = content
+                            print(f"✅ Đã đọc kết quả từ file mới nhất: {os.path.basename(latest_path)}")
+            except Exception as e:
+                print(f"⚠️  Không thể đọc file mới nhất: {e}")
+        
         if result_text:
             result_text = result_text.strip()
         
@@ -670,7 +771,7 @@ def ocr_base64():
         
         return jsonify({
             'success': True,
-            'text': result_text
+            'text': result_text if result_text else "Không tìm thấy kết quả. Vui lòng kiểm tra logs."
         })
         
     except Exception as e:
