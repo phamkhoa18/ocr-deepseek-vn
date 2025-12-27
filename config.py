@@ -27,7 +27,7 @@ def get_optimal_config():
                     'device': 'cuda',
                     'dtype': 'bfloat16',
                     'base_size': 1024,
-                    'image_size': 1280,
+                    'image_size': 640,  # Giảm xuống 640 để tránh lỗi CUDA kernel
                     'crop_mode': True
                 }
             elif gpu_memory >= 8:

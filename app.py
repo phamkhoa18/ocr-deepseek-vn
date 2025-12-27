@@ -243,18 +243,52 @@ def ocr():
         # Process OCR
         output_path = os.path.join(OUTPUT_FOLDER, f"result_{filename}")
         
+        # Giảm kích thước ảnh nếu quá lớn để tránh lỗi CUDA
+        actual_image_size = IMAGE_SIZE
+        if image.size[0] > 2048 or image.size[1] > 2048:
+            # Resize ảnh lớn xuống
+            max_dim = max(image.size)
+            if max_dim > 2048:
+                scale = 2048 / max_dim
+                new_size = (int(image.size[0] * scale), int(image.size[1] * scale))
+                image = image.resize(new_size, Image.Resampling.LANCZOS)
+                image.save(filepath)  # Lưu lại ảnh đã resize
+                print(f"⚠️  Ảnh quá lớn, đã resize từ {image.size} xuống {new_size}")
+        
         try:
+            # Thử với image_size nhỏ hơn nếu gặp lỗi
             result = model.infer(
                 tokenizer,
                 prompt=prompt_text,
                 image_file=filepath,
                 output_path=output_path,
                 base_size=BASE_SIZE,
-                image_size=IMAGE_SIZE,
+                image_size=min(actual_image_size, 640),  # Giới hạn tối đa 640
                 crop_mode=CROP_MODE,
                 save_results=True,
-                test_compress=True
+                test_compress=False  # Tắt test_compress để tránh lỗi
             )
+        except RuntimeError as e:
+            error_str = str(e)
+            if "masked_scatter" in error_str or "CUDA" in error_str:
+                # Thử lại với image_size nhỏ hơn
+                print(f"⚠️  Lỗi CUDA với image_size={actual_image_size}, thử lại với 512...")
+                try:
+                    result = model.infer(
+                        tokenizer,
+                        prompt=prompt_text,
+                        image_file=filepath,
+                        output_path=output_path,
+                        base_size=768,
+                        image_size=512,
+                        crop_mode=CROP_MODE,
+                        save_results=True,
+                        test_compress=False
+                    )
+                except Exception as e2:
+                    raise Exception(f"Lỗi khi xử lý OCR (đã thử giảm kích thước): {str(e2)}")
+            else:
+                raise Exception(f"Lỗi khi xử lý OCR: {error_str}")
         except Exception as e:
             raise Exception(f"Lỗi khi xử lý OCR: {str(e)}")
         
@@ -336,6 +370,16 @@ def ocr_base64():
         # Process OCR
         output_path = os.path.join(OUTPUT_FOLDER, f"result_{temp_filename}")
         
+        # Giảm kích thước ảnh nếu quá lớn
+        if image.size[0] > 2048 or image.size[1] > 2048:
+            max_dim = max(image.size)
+            if max_dim > 2048:
+                scale = 2048 / max_dim
+                new_size = (int(image.size[0] * scale), int(image.size[1] * scale))
+                image = image.resize(new_size, Image.Resampling.LANCZOS)
+                image.save(temp_filepath)
+                print(f"⚠️  Ảnh quá lớn, đã resize từ {image.size} xuống {new_size}")
+        
         try:
             result = model.infer(
                 tokenizer,
@@ -343,11 +387,31 @@ def ocr_base64():
                 image_file=temp_filepath,
                 output_path=output_path,
                 base_size=BASE_SIZE,
-                image_size=IMAGE_SIZE,
+                image_size=min(IMAGE_SIZE, 640),  # Giới hạn tối đa 640
                 crop_mode=CROP_MODE,
                 save_results=True,
-                test_compress=True
+                test_compress=False  # Tắt test_compress để tránh lỗi
             )
+        except RuntimeError as e:
+            error_str = str(e)
+            if "masked_scatter" in error_str or "CUDA" in error_str:
+                print(f"⚠️  Lỗi CUDA, thử lại với image_size nhỏ hơn...")
+                try:
+                    result = model.infer(
+                        tokenizer,
+                        prompt=prompt_text,
+                        image_file=temp_filepath,
+                        output_path=output_path,
+                        base_size=768,
+                        image_size=512,
+                        crop_mode=CROP_MODE,
+                        save_results=True,
+                        test_compress=False
+                    )
+                except Exception as e2:
+                    raise Exception(f"Lỗi khi xử lý OCR (đã thử giảm kích thước): {str(e2)}")
+            else:
+                raise Exception(f"Lỗi khi xử lý OCR: {error_str}")
         except Exception as e:
             raise Exception(f"Lỗi khi xử lý OCR: {str(e)}")
         
