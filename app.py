@@ -25,19 +25,53 @@ def init_model():
     """Initialize the DeepSeek-OCR model"""
     global model, tokenizer
     try:
-        print("Đang tải tokenizer...")
+        # Hiển thị thông tin cấu hình
+        print("=" * 60)
+        print("Cấu hình hệ thống:")
+        print(f"  - Device: {DEVICE}")
+        print(f"  - Dtype: {DTYPE}")
+        print(f"  - Image size: {IMAGE_SIZE}x{IMAGE_SIZE}")
+        print(f"  - Base size: {BASE_SIZE}")
+        if torch.cuda.is_available():
+            gpu_name = torch.cuda.get_device_name(0)
+            gpu_memory = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+            print(f"  - GPU: {gpu_name} ({gpu_memory:.1f}GB VRAM)")
+        else:
+            print("  - GPU: Không có (sử dụng CPU)")
+        print("=" * 60)
+        
+        print("\nĐang tải tokenizer...")
         tokenizer = AutoTokenizer.from_pretrained(
             MODEL_NAME, 
             trust_remote_code=True
         )
         
-        print("Đang tải model...")
-        model = AutoModel.from_pretrained(
-            MODEL_NAME,
-            _attn_implementation='flash_attention_2',
-            trust_remote_code=True,
-            use_safetensors=True
-        )
+        print("Đang tải model (có thể mất vài phút lần đầu)...")
+        print("Lưu ý: Model sẽ được tải từ Hugging Face (~20-30GB)")
+        
+        # Thử dùng flash attention nếu có GPU, nếu không thì dùng default
+        try:
+            if DEVICE == 'cuda' and torch.cuda.is_available():
+                model = AutoModel.from_pretrained(
+                    MODEL_NAME,
+                    _attn_implementation='flash_attention_2',
+                    trust_remote_code=True,
+                    use_safetensors=True
+                )
+            else:
+                model = AutoModel.from_pretrained(
+                    MODEL_NAME,
+                    trust_remote_code=True,
+                    use_safetensors=True
+                )
+        except Exception as e:
+            print(f"Warning: Không thể dùng flash_attention_2: {e}")
+            print("Đang thử với attention mặc định...")
+            model = AutoModel.from_pretrained(
+                MODEL_NAME,
+                trust_remote_code=True,
+                use_safetensors=True
+            )
         
         # Move to device and set dtype
         dtype_map = {
@@ -49,14 +83,22 @@ def init_model():
         
         model = model.eval()
         if torch.cuda.is_available() and DEVICE == 'cuda':
+            print(f"Đang chuyển model lên GPU với dtype={DTYPE}...")
             model = model.cuda().to(dtype)
         else:
+            print(f"Đang chuyển model lên CPU với dtype={DTYPE}...")
             model = model.to(dtype)
         
-        print("Model đã được tải thành công!")
+        print("\n✅ Model đã được tải thành công!")
+        print("=" * 60)
         return True
     except Exception as e:
-        print(f"Lỗi khi tải model: {str(e)}")
+        print(f"\n❌ Lỗi khi tải model: {str(e)}")
+        print("\nGợi ý khắc phục:")
+        print("  1. Kiểm tra kết nối internet")
+        print("  2. Đảm bảo có đủ dung lượng ổ cứng (50GB+)")
+        print("  3. Thử đổi DEVICE='cpu' trong config.py nếu GPU có vấn đề")
+        print("  4. Giảm IMAGE_SIZE trong config.py nếu thiếu RAM/VRAM")
         return False
 
 @app.route('/')

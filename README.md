@@ -15,11 +15,28 @@
 
 ### Yêu cầu hệ thống
 
-- Python 3.8+
-- CUDA 11.8+ (khuyến nghị để sử dụng GPU)
-- PyTorch 2.6.0
-- RAM: Tối thiểu 8GB (khuyến nghị 16GB+)
-- GPU: Khuyến nghị có GPU với ít nhất 8GB VRAM
+#### ⚠️ Cấu hình Tối thiểu (CPU)
+- **Python**: 3.8+
+- **RAM**: 8GB (tối thiểu) - 16GB (khuyến nghị)
+- **Ổ cứng**: 50GB trống
+- **GPU**: Không cần (chạy trên CPU, chậm ~30-60s/ảnh)
+
+#### ✅ Cấu hình Khuyến nghị (GPU)
+- **Python**: 3.8+
+- **GPU**: NVIDIA với 6GB+ VRAM (GTX 1660, RTX 2060, RTX 3060...)
+- **CUDA**: 11.8+
+- **RAM**: 16GB
+- **Ổ cứng**: 50GB trống
+- **Hiệu suất**: 5-15 giây/ảnh
+
+#### 🔥 Cấu hình Tối ưu (GPU High-end)
+- **GPU**: NVIDIA với 10GB+ VRAM (RTX 3080, RTX 4090, A100...)
+- **RAM**: 32GB+
+- **Hiệu suất**: 1-3 giây/ảnh
+
+> 📋 **Xem chi tiết**: Đọc file [CONFIG_GUIDE.md](CONFIG_GUIDE.md) để biết thêm về các mức cấu hình và cách tối ưu.
+
+> 🔍 **Kiểm tra hệ thống**: Chạy `python check_system.py` để kiểm tra cấu hình và nhận khuyến nghị.
 
 ### Bước 1: Clone repository
 
