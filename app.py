@@ -327,33 +327,82 @@ def ocr():
         # Read result - try multiple methods
         result_text = ""
         
-        # Method 1: Try to read from output file first (most reliable)
-        txt_file = f"{output_path}.txt"
-        if os.path.exists(txt_file):
-            try:
-                with open(txt_file, 'r', encoding='utf-8') as f:
-                    result_text = f.read().strip()
-            except Exception as e:
-                print(f"Warning: Không thể đọc file {txt_file}: {e}")
+        # Method 1: Try to read from output file (model.infer saves to file)
+        output_dir = OUTPUT_FOLDER
+        possible_files = [
+            f"{output_path}.txt",
+            f"{output_path}",
+            os.path.join(output_dir, f"result_{filename}.txt"),
+            os.path.join(output_dir, f"result_{filename}"),
+        ]
         
-        # Method 2: If no file, try to get from result object
-        if not result_text:
+        # Tìm file mới nhất trong output_dir có chứa filename
+        if os.path.exists(output_dir):
+            all_files = []
+            for f in os.listdir(output_dir):
+                if filename in f or "result_" in f:
+                    filepath_full = os.path.join(output_dir, f)
+                    if os.path.isfile(filepath_full):
+                        all_files.append((filepath_full, os.path.getmtime(filepath_full)))
+            
+            if all_files:
+                # Sắp xếp theo thời gian, lấy file mới nhất
+                all_files.sort(key=lambda x: x[1], reverse=True)
+                possible_files.insert(0, all_files[0][0])
+        
+        # Thử đọc từ các file có thể
+        for file_path in possible_files:
+            if os.path.exists(file_path):
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        content = f.read().strip()
+                        if content and len(content) > 10:  # Đảm bảo có nội dung
+                            result_text = content
+                            print(f"✅ Đã đọc kết quả từ: {file_path}")
+                            break
+                except Exception as e:
+                    print(f"⚠️  Không thể đọc file {file_path}: {e}")
+                    continue
+        
+        # Method 2: Try to get from result object
+        if not result_text and result is not None:
             if isinstance(result, dict):
-                result_text = result.get('text', result.get('result', str(result)))
+                result_text = result.get('text', result.get('result', result.get('output', str(result))))
             elif isinstance(result, str):
                 result_text = result
             elif hasattr(result, 'text'):
                 result_text = result.text
+            elif hasattr(result, 'output'):
+                result_text = result.output
             else:
-                result_text = str(result)
+                result_text = str(result) if result else ""
+        
+        # Method 3: Nếu vẫn không có, tìm trong OUTPUT_FOLDER file mới nhất
+        if not result_text and os.path.exists(OUTPUT_FOLDER):
+            try:
+                files = [f for f in os.listdir(OUTPUT_FOLDER) if os.path.isfile(os.path.join(OUTPUT_FOLDER, f))]
+                if files:
+                    # Lấy file mới nhất
+                    latest_file = max(files, key=lambda f: os.path.getmtime(os.path.join(OUTPUT_FOLDER, f)))
+                    latest_path = os.path.join(OUTPUT_FOLDER, latest_file)
+                    with open(latest_path, 'r', encoding='utf-8') as f:
+                        content = f.read().strip()
+                        if content:
+                            result_text = content
+                            print(f"✅ Đã đọc kết quả từ file mới nhất: {latest_file}")
+            except Exception as e:
+                print(f"⚠️  Không thể đọc file mới nhất: {e}")
         
         # Clean up result text
         if result_text:
             result_text = result_text.strip()
+        else:
+            print(f"⚠️  Không tìm thấy kết quả. Output path: {output_path}")
+            print(f"⚠️  Files trong OUTPUT_FOLDER: {os.listdir(OUTPUT_FOLDER) if os.path.exists(OUTPUT_FOLDER) else 'Không tồn tại'}")
         
         return jsonify({
             'success': True,
-            'text': result_text,
+            'text': result_text if result_text else "Không tìm thấy kết quả. Vui lòng kiểm tra logs.",
             'filename': filename
         })
         
@@ -447,30 +496,54 @@ def ocr_base64():
         except Exception as e:
             raise Exception(f"Lỗi khi xử lý OCR: {str(e)}")
         
-        # Read result - try multiple methods
+        # Read result - try multiple methods (same as ocr function)
         result_text = ""
         
-        # Method 1: Try to read from output file first (most reliable)
-        txt_file = f"{output_path}.txt"
-        if os.path.exists(txt_file):
-            try:
-                with open(txt_file, 'r', encoding='utf-8') as f:
-                    result_text = f.read().strip()
-            except Exception as e:
-                print(f"Warning: Không thể đọc file {txt_file}: {e}")
+        # Method 1: Try to read from output file
+        possible_files = [
+            f"{output_path}.txt",
+            f"{output_path}",
+            os.path.join(OUTPUT_FOLDER, f"result_{temp_filename}.txt"),
+            os.path.join(OUTPUT_FOLDER, f"result_{temp_filename}"),
+        ]
         
-        # Method 2: If no file, try to get from result object
-        if not result_text:
+        # Tìm file mới nhất
+        if os.path.exists(OUTPUT_FOLDER):
+            all_files = []
+            for f in os.listdir(OUTPUT_FOLDER):
+                if temp_filename in f or "result_" in f:
+                    filepath_full = os.path.join(OUTPUT_FOLDER, f)
+                    if os.path.isfile(filepath_full):
+                        all_files.append((filepath_full, os.path.getmtime(filepath_full)))
+            
+            if all_files:
+                all_files.sort(key=lambda x: x[1], reverse=True)
+                possible_files.insert(0, all_files[0][0])
+        
+        for file_path in possible_files:
+            if os.path.exists(file_path):
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        content = f.read().strip()
+                        if content and len(content) > 10:
+                            result_text = content
+                            break
+                except:
+                    continue
+        
+        # Method 2: Try result object
+        if not result_text and result is not None:
             if isinstance(result, dict):
-                result_text = result.get('text', result.get('result', str(result)))
+                result_text = result.get('text', result.get('result', result.get('output', str(result))))
             elif isinstance(result, str):
                 result_text = result
             elif hasattr(result, 'text'):
                 result_text = result.text
+            elif hasattr(result, 'output'):
+                result_text = result.output
             else:
-                result_text = str(result)
+                result_text = str(result) if result else ""
         
-        # Clean up result text
         if result_text:
             result_text = result_text.strip()
         
